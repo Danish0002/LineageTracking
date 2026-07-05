@@ -3,6 +3,7 @@ from config.settings import settings
 from core.logger import get_logger
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
+import streamlit as st
 
 logger = get_logger("SnowflakeConnectionService")
 
@@ -127,10 +128,10 @@ class MockConnection:
         pass
 
 
-def get_snowflake_connection():
+@st.cache_resource(show_spinner=False)
+def _get_cached_snowflake_connection():
     """
-    Establishes and returns a validated connection to Snowflake.
-    Falls back to a MockConnection if MOCK_MODE is enabled or configuration is missing.
+    Internal cached method to establish and return a validated connection to Snowflake.
     """
     if settings.MOCK_MODE:
         logger.info("Mock Mode is enabled. Falling back to Mock Snowflake Connection.")
@@ -227,3 +228,22 @@ def get_snowflake_connection():
             raise e
         logger.warning(f"Failed to connect to real Snowflake ({e}). Falling back to Mock Snowflake Connection.")
         return MockConnection()
+
+
+def get_snowflake_connection():
+    """
+    Establishes and returns a validated connection to Snowflake (self-healing cache wrapper).
+    """
+    conn = _get_cached_snowflake_connection()
+    
+    # Bypass liveness check for Mock connections
+    if settings.MOCK_MODE or isinstance(conn, MockConnection):
+        return conn
+        
+    # Check if connection is alive, reconnect if dead
+    if not check_snowflake_connection_liveness(conn):
+        logger.warning("Cached Snowflake connection is dead. Clearing cache and reconnecting...")
+        _get_cached_snowflake_connection.clear()
+        conn = _get_cached_snowflake_connection()
+        
+    return conn
