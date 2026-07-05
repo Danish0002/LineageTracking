@@ -312,7 +312,7 @@ def trace_lineage(
 # Pipeline Ingestion Control Sidebar
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.header("🚀 Ingest & Sync Record")
+    st.header(" Ingest & Sync Record")
     st.markdown(
         "Add a new record to Snowflake. The pipeline will automatically sync it to ADLS and Databricks to enable record-level lineage tracing."
     )
