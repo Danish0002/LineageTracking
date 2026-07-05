@@ -102,12 +102,9 @@ class MockConnection:
 
 
 @st.cache_resource(show_spinner=False)
-def get_databricks_connection():
+def _get_cached_databricks_connection():
     """
-    Establishes connection to Databricks SQL warehouse.
-
-    Returns:
-        Connection object
+    Internal cached method to establish connection to Databricks.
     """
     if settings.MOCK_MODE:
         logger.info("Mock Mode is enabled. Falling back to Mock Databricks Connection.")
@@ -146,6 +143,25 @@ def get_databricks_connection():
             return MockConnection()
         logger.error(f"Failed to connect to Databricks: {e}")
         raise
+
+
+def get_databricks_connection():
+    """
+    Establishes connection to Databricks SQL warehouse (self-healing cache wrapper).
+    """
+    conn = _get_cached_databricks_connection()
+    
+    # Bypass liveness check for Mock connections
+    if settings.MOCK_MODE or isinstance(conn, MockConnection):
+        return conn
+        
+    # Check if connection is alive, reconnect if dead
+    if not check_databricks_connection_liveness(conn):
+        logger.warning("Cached Databricks connection is dead. Clearing cache and reconnecting...")
+        _get_cached_databricks_connection.clear()
+        conn = _get_cached_databricks_connection()
+        
+    return conn
 
 
 def check_databricks_connection_liveness(conn):
