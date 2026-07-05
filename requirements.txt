@@ -1,0 +1,16 @@
+JayDeBeApi
+JPype1
+python-dotenv
+pandas
+streamlit
+graphviz
+streamlit-agraph
+pyvis
+databricks-sql-connector
+azure-storage-blob
+openai
+faiss-cpu
+langchain
+langchain-core
+langgraph
+snowflake-connector-python

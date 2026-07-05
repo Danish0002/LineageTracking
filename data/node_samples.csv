@@ -1,0 +1,10 @@
+domain,dataset,element,sample_value,project_id
+snowflake,customer_metadata,customer_id,CUST_001,PROJ_001
+snowflake,customer_metadata,customer_id,CUST_002,PROJ_001
+snowflake,customer_metadata,customer_id,CUST_003,PROJ_002
+adls,staging,customer_id,CUST_001,PROJ_001
+adls,staging,customer_id,CUST_002,PROJ_001
+adls,staging,customer_id,CUST_003,PROJ_002
+databricks,customer_gold,customer_id,CUST_001,PROJ_001
+databricks,customer_gold,customer_id,CUST_002,PROJ_001
+databricks,customer_gold,customer_id,CUST_003,PROJ_002
