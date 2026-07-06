@@ -1,80 +1,123 @@
-# Record Level Lineage POC
+# Record Level Lineage Explorer & Data Pipeline
 
-A Python-based utility for tracing data lineage in Denodo. This tool connects to the Denodo metadata repository using JDBC (JayDeBeApi) to perform lineage diagnostics and extract upstream/downstream dependencies.
+A Python-based Streamlit dashboard and data pipeline for tracing, matching, and exploring record-level data lineage across **Snowflake**, **Azure Data Lake Storage (ADLS)**, and **Databricks**. 
 
-## Project Structure
+The application resolves the structural column lineage paths, fetches sample values at each node from all three platforms, checks for value consistency, and includes an AI-driven Chatbot Assistant powered by LangChain and FAISS vector search to analyze lineage history.
 
-The project follows a modular service-based architecture:
+---
+
+##  Key Features
+
+* **Recursive Lineage Graph Rendering**: Traces column-level mapping dynamically (e.g., Snowflake ➔ ADLS ➔ Databricks) and visualizes the dependency graph interactively using VisJS.
+* **Record-Level Value Consistency Check**: Compares data samples (like specific `Customer ID`s and `Project ID`s) across all stages of the pipeline to verify data integrity.
+* **Auto-Sync Ingestion Pipeline**: Contains a CLI script and a Streamlit sidebar form to ingest a new record into Snowflake, append the lineage nodes to ADLS (`node_samples.csv`), and synchronize it to Databricks.
+* **Self-Healing Database Cache**: Automatically detects closed database sessions or timeouts for Databricks and Snowflake, refreshes the cached connections, and retries seamlessly.
+* **AI Lineage Assistant**: Features an embedded chatbot agent (supervisor pattern) that retrieves relevant context from a FAISS vector store of historical lineage traces to answer complex engineering questions.
+
+---
+
+##  Project Structure
 
 ```text
-record_level_lineage_poc/
-+-- config/                 # Configuration management
-¦   +-- settings.py         # Loads variables from .env
-+-- database/               # Database connectivity layer
-¦   +-- connection.py       # Handles JayDeBeApi connections
-+-- services/               # Business logic
-¦   +-- connection_test.py  # Diagnostic & validation logic
-+-- main.py                 # Application entry point (Pre-flight checks)
-+-- .env                    # Secrets (Excluded from Git)
-+-- requirements.txt        # Python dependencies
-```
-
-## Prerequisites
-
-Before running the application, ensure you have the following installed:
-
-- Python 3.10+  
-- Java (JDK/JRE 11 or 17) - Required for the JDBC driver.  
-  Verify by running:
-
-```bash
-java -version
+Record-level-lineage/
+│
+├── database/               # Database connectivity & operations
+│   ├── snowflake.py        # Snowflake connection with self-healing caching
+│   ├── adls.py             # ADLS container connection and CSV file operations
+│   ├── databricks.py       # Databricks SQL connection and tables setup
+│   └── vector_store.py     # FAISS vector store database for trace archiving
+│
+├── services/               # Core business services
+│   ├── pipeline.py         # snowflake-ADLS-Databricks ingestion pipeline
+│   ├── tracer.py           # Recursive lineage tree tracer
+│   └── llm_client.py       # Databricks OpenAI endpoint client
+│
+├── utils/                  # Helper modules
+│   ├── agents/             # LangChain chatbot, supervisor, guardrails, & prompts
+│   └── graph_rendering/    # vis.js graph builders, javascript, & HTML renderers
+│
+├── data/                   # Data samples and index directory
+│   ├── lineage_index/      # FAISS vector store binary index and metadata
+│   └── node_samples.csv    # Local CSV backups
+│
+├── main.py                 # Streamlit UI dashboard entry point
+├── ingest_record.py        # Command line data ingestion pipeline trigger
+├── packages.txt            # Streamlit Cloud system dependencies (Java JRE, Graphviz)
+├── requirements.txt        # Python package dependencies
+└── .env                    # Environment variables (connection string, tokens)
 ```
 
 ---
 
-## Setup Instructions
+## 🛠️ Installation & Setup
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/gsk-tech/Record-level-lineage.git
-cd Record-level-lineage
-```
+### 1. Prerequisites
+Ensure you have the following installed:
+* Python 3.10+
+* Java (JDK/JRE 11 or 17) - Required for JDBC drivers. Verify with:
+  ```bash
+  java -version
+  ```
 
-### 2. Install Dependencies
-It is recommended to use a virtual environment:
-
+### 2. Install Python Dependencies
+Create a virtual environment and install requirements:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Add the JDBC Driver
-Important: The Denodo JDBC driver is not included in this repository due to size and licensing.  
-
-Locate the file: `denodo-vdp-jdbcdriver-9.3.5.jar`  
-Place it in the **root folder** of this project (same level as `main.py`).
-
-### 4. Configure Credentials (.env)
-Create a file named `.env` in the root directory. This file is ignored by Git for security.  
-
-Template:
-
+### 3. Configure Connection Credentials (`.env`)
+Create a `.env` file in the root directory. Paste your credentials using this format:
 ```ini
-# .env file configuration
-DENODO_HOST=denodo-eus2-dev.gsk.com
-DENODO_PORT=9999
-DENODO_DB=ddfmetadata_dev
-DENODO_USER=YOUR_USERNAME_HERE
-DENODO_PASSWORD=YOUR_PASSWORD_HERE
-JDBC_DRIVER_PATH=denodo-vdp-jdbcdriver-9.3.5.jar
+MOCK_MODE=false
+
+# SNOWFLAKE
+SNOWFLAKE_ACCOUNT=your-snowflake-account
+SNOWFLAKE_USER=your-user
+SNOWFLAKE_PASSWORD="your-password"
+SNOWFLAKE_WAREHOUSE=COMPUTE_WH
+SNOWFLAKE_DATABASE=lineageDatabase
+SNOWFLAKE_SCHEMA=lineageSchema
+
+# AZURE STORAGE (ADLS)
+AZURE_STORAGE_ACCOUNT_NAME=yourstorageaccount
+AZURE_CONTAINER_NAME=lineage
+AZURE_SAS_TOKEN="your-sas-token"
+AZURE_SAS_URL="your-sas-url"
+CSV_FILE_PATH=node_samples.csv
+
+# DATABRICKS
+DATABRICKS_BASE_URL=https://your-databricks-instance.cloud.databricks.com/serving-endpoints
+DATABRICKS_ACCESS_TOKEN=your-token
+DATABRICKS_SERVER_HOSTNAME=your-databricks-instance.cloud.databricks.com
+DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/yourwarehouseid
+DATABRICKS_CATALOG=lineagecatalog
+DATABRICKS_SCHEMA=lineageschema
+DATABRICKS_TABLE=node_samples
 ```
 
 ---
 
-## Usage
+##  Running the Application
 
-To run the application and perform connection diagnostics:
-
+### Launch Streamlit App
+Run the following command to start the local dashboard:
 ```bash
-python main.py
+streamlit run main.py
 ```
+Open [http://localhost:8501](http://localhost:8501) in your browser.
+
+### Ingest Data via CLI
+To sync a new record into Snowflake, ADLS, and Databricks directly from the terminal, execute:
+```bash
+python ingest_record.py --customer-id CUST_999 --project-id PROJ_999
+```
+
+---
+
+##  Deployment on Streamlit Cloud
+
+1. Push the contents of the `LineageDemo` folder to a public or private GitHub repository.
+2. Go to [Streamlit Community Cloud](https://share.streamlit.io/) and click **"New App"**.
+3. Select your repository and branch, and point the main file path to `main.py`.
+4. Go to **Advanced settings... -> Secrets** and paste your TOML-formatted `.env` credentials.
+5. Click **Deploy**. (The system will automatically install Java and Graphviz using `packages.txt`).
